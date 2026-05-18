@@ -28,8 +28,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#ifdef WIN32
+#include <direct.h>
+#else
 #include <sys/stat.h>
 #include <sys/types.h>
+#endif
 
 int main (int argc, char **argv) {
 	FILE *fin;
@@ -84,7 +88,11 @@ int main (int argc, char **argv) {
 		for (uint j = 0; buf[j]; j++) {
 			if (j != 0 && buf[j] == '/') {
 				buf[j] = 0;
+#ifdef WIN32
+				_mkdir((char *)buf);
+#else
 				mkdir((char *)buf, 0755);
+#endif
 				buf[j] = '/';
 			}
 		}
