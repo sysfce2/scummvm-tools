@@ -163,9 +163,9 @@ extract_mps_OBJS := \
 	$(UTILS)
 
 extract_obb_OBJS := \
-	engines/tetraedge/extract_obb.o
-  common/dlc.o \
-  $(UTILS)
+	engines/tetraedge/extract_obb.o \
+	common/dcl.o \
+	$(UTILS)
   
 extract_lfg_OBJS := \
 	engines/scumm/extract_lfg.o \
