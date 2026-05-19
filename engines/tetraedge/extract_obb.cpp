@@ -101,8 +101,13 @@ int main (int argc, char **argv) {
 			fprintf (stderr, "Unable to open %s: %s\n", fullpath.c_str(), strerror(errno));
 			return -6;
 		}
+#ifdef WIN32
+		__int64 oldoff = _ftelli64(fin);
+		_fseeki64(fin, offset, SEEK_SET);
+#else
 		off_t oldoff = ftello(fin);
 		fseeko(fin, offset, SEEK_SET);
+#endif
 		for (uint32 j = 0; j < sz; ) {
 			uint32 chunk = sizeof(buf);
 			if (chunk > sz - j)
@@ -112,7 +117,11 @@ int main (int argc, char **argv) {
 			j += chunk;
 		}
 		fclose(fout);
+#ifdef WIN32
+		_fseeki64(fin, oldoff, SEEK_SET);
+#else
 		fseeko(fin, oldoff, SEEK_SET);
+#endif
 	}
 	fclose(fin);
 
