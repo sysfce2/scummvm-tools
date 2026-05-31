@@ -19,7 +19,7 @@
  *
  */
 
-/* MACS2 Script disassembler */
+/* MACS2 Script decompiler */
 
 #include <stdio.h>
 #include <stdint.h>
@@ -45,76 +45,36 @@ static uint16_t readWord() {
 
 static std::string formatValue() {
 	uint8_t type = readByte();
-	uint16_t index = readWord();
+	uint16_t val = readWord();
 	if (type == 0x00) {
 		char buf[32];
-		snprintf(buf, sizeof(buf), "%u", index);
+		snprintf(buf, sizeof(buf), "%u", val);
 		return buf;
 	} else if (type == 0xFF) {
-		// Special runtime values
-		const char *name = nullptr;
-		switch (index) {
-		case 0x01: name = "interacted_use"; break;
-		case 0x02: name = "interacted_look"; break;
-		case 0x03: name = "interacted_talk"; break;
-		case 0x04: name = "char_area"; break;
-		case 0x05: name = "noop"; break;
-		case 0x06: return "1";
-		case 0x07: return "0";
-		case 0x08: return "0";
-		case 0x09: return "0";
-		case 0x0A: return "1";
-		case 0x0B: name = "repeat_run_flag"; break;
-		case 0x0C: return "1";
-		case 0x0D: name = "chosen_dialogue_option"; break;
-		case 0x23: name = "path_walkable_result"; break;
-		case 0x24: name = "actor_x"; break;
-		case 0x25: name = "actor_y"; break;
-		case 0x26: name = "is_scene_init"; break;
-		case 0x27: name = "repeat_char_area"; break;
-		case 0x28: name = "inventory_check_result"; break;
-		case 0x29: name = "anim_range_test_result"; break;
-		case 0x2A: name = "inventory_combine_flag"; break;
-		case 0x2B: name = "inventory_action_flag"; break;
-		case 0x2C: name = "interacted_panel_use"; break;
-		case 0x2D: name = "current_scene"; break;
-		case 0x2E: return "2";
-		case 0x2F: name = "last_scene"; break;
-		case 0x30: name = "music_enabled"; break;
-		case 0x31: name = "sound_enabled"; break;
+		switch (val) {
+		case 0x01: return "interactedUse";
+		case 0x02: return "interactedLook";
+		case 0x03: return "interactedTalk";
+		case 0x04: return "areaAtActor";
+		case 0x0B: return "isRepeatRun";
+		case 0x0D: return "dialogueResult";
+		case 0x23: return "pathWalkable";
+		case 0x24: return "actorX";
+		case 0x25: return "actorY";
+		case 0x26: return "isSceneInit";
+		case 0x28: return "invCheck";
+		case 0x2A: return "invCombine";
+		case 0x2B: return "invAction";
+		case 0x2D: return "curScene";
+		case 0x2F: return "prevScene";
 		default:
-			if (index >= 0x0E && index <= 0x22) {
-				char buf[32];
-				snprintf(buf, sizeof(buf), "%u", index - 0x0D);
-				return buf;
-			}
 			char buf[32];
-			snprintf(buf, sizeof(buf), "$special_0x%02x", index);
+			snprintf(buf, sizeof(buf), "special[0x%02x]", val);
 			return buf;
 		}
-		return std::string("$") + name;
-	} else {
-		char buf[32];
-		snprintf(buf, sizeof(buf), "var[%u]", index);
-		return buf;
 	}
-}
-
-// Read a value but return both words as "val" (for 32-bit context)
-static std::string formatValue32() {
-	return formatValue();
-}
-
-static std::string formatObjectId() {
-	std::string v = formatValue();
-	return v + " - 0x400";
-}
-
-static std::string formatSaveTarget() {
-	readByte(); // type (ignored for save target)
-	uint16_t index = readWord();
 	char buf[32];
-	snprintf(buf, sizeof(buf), "var[%u]", index);
+	snprintf(buf, sizeof(buf), "var[%u]", val);
 	return buf;
 }
 
@@ -126,7 +86,7 @@ static const char *cmpOpName(uint8_t op) {
 	case 0x04: return ">";
 	case 0x05: return "<=";
 	case 0x06: return ">=";
-	default: return "??";
+	default: return "?";
 	}
 }
 
@@ -141,490 +101,472 @@ static void disassemble() {
 		uint8_t length = readByte();
 		uint32_t endPos = pos + length;
 
-		// Adjust indent before printing for block-end opcodes
+		// Adjust indent for block-end opcodes
 		if (opcode == 0x07 && indent > 0) indent--;
+		if (opcode == 0x08 && indent > 0) indent--;
 
-		// Print indent
 		for (int i = 0; i < indent; i++) printf("  ");
-		printf("[%04X] ", instrAddr);
+		printf("%04x: ", instrAddr);
 
 		switch (opcode) {
-		case 0x01: {
-			readByte(); // padding
+		case 0x01: { // setVar
+			readByte();
 			uint16_t varIdx = readWord();
 			std::string val = formatValue();
-			printf("SET var[%u] = %s\n", varIdx, val.c_str());
+			printf("setVar var[%u] = %s\n", varIdx, val.c_str());
 			break;
 		}
-		case 0x02: {
-			readByte(); // padding
+		case 0x02: { // setVarOr
+			readByte();
 			uint16_t varIdx = readWord();
-			std::string val1 = formatValue();
-			std::string val2 = formatValue();
-			printf("SET_OR var[%u] = %s | %s\n", varIdx, val1.c_str(), val2.c_str());
+			std::string val = formatValue();
+			printf("setVarOr var[%u] = %s\n", varIdx, val.c_str());
 			break;
 		}
-		case 0x03: {
+		case 0x03: { // ifTrue
 			std::string val = formatValue();
-			printf("IF_TRUE %s THEN SKIP {\n", val.c_str());
+			printf("ifTrue (%s)\n", val.c_str());
 			indent++;
 			break;
 		}
-		case 0x04: {
+		case 0x04: { // ifFalse
 			std::string val = formatValue();
-			printf("IF_FALSE %s THEN SKIP {\n", val.c_str());
+			printf("ifFalse (%s)\n", val.c_str());
 			indent++;
 			break;
 		}
-		case 0x05: {
+		case 0x05: { // compare
 			uint8_t cmpOp = readByte();
-			std::string v1 = formatValue();
-			std::string v2 = formatValue();
-			printf("IF %s %s %s {\n", v1.c_str(), cmpOpName(cmpOp), v2.c_str());
+			std::string a = formatValue();
+			std::string b = formatValue();
+			printf("compare (%s %s %s)\n", a.c_str(), cmpOpName(cmpOp), b.c_str());
 			indent++;
 			break;
 		}
-		case 0x06: {
+		case 0x06: { // ifInteraction
 			uint8_t subOp = readByte();
-			std::string obj1 = formatValue();
-			std::string obj2 = formatValue();
-			std::string cmp1 = formatValue();
-			std::string cmp2 = formatValue();
-			if (subOp == 0x01)
-				printf("IF_USE_ON (%s, %s) MATCHES (%s, %s) {\n", obj1.c_str(), obj2.c_str(), cmp1.c_str(), cmp2.c_str());
-			else
-				printf("IF_USE_ON (%s, %s) NOT_MATCHES (%s, %s) {\n", obj1.c_str(), obj2.c_str(), cmp1.c_str(), cmp2.c_str());
+			std::string i = formatValue();
+			std::string a = formatValue();
+			std::string b = formatValue();
+			printf("ifInteraction %s(%s, %s, %s)\n", subOp == 2 ? "NOT " : "", i.c_str(), a.c_str(), b.c_str());
 			indent++;
 			break;
 		}
-		case 0x07: {
-			printf("}\n");
+		case 0x07: { // endIf
+			printf("endIf\n");
 			break;
 		}
-		case 0x08: {
-			printf("} ELSE {\n");
+		case 0x08: { // else
+			printf("else\n");
+			indent++;
 			break;
 		}
-		case 0x0A: {
+		case 0x0A: { // printString
 			std::string x = formatValue();
 			std::string y = formatValue();
 			uint16_t strOffset = readWord();
 			uint16_t numLines = readWord();
-			printf("PRINT_STRING pos=(%s, %s) strOffset=%u numLines=%u\n", x.c_str(), y.c_str(), strOffset, numLines);
+			printf("printString pos=(%s, %s) strOffset=%u numLines=%u\n", x.c_str(), y.c_str(), strOffset, numLines);
 			break;
 		}
-		case 0x0B: {
-			std::string objId = formatObjectId();
+		case 0x0B: { // moveObject
+			std::string obj = formatValue();
 			std::string scene = formatValue();
 			std::string x = formatValue();
 			std::string y = formatValue();
-			printf("MOVE_OBJECT obj=%s toScene=%s pos=(%s, %s)\n", objId.c_str(), scene.c_str(), x.c_str(), y.c_str());
+			printf("moveObject obj=%s scene=%s pos=(%s, %s)\n", obj.c_str(), scene.c_str(), x.c_str(), y.c_str());
 			break;
 		}
-		case 0x0C: {
-			std::string scene = formatValue32();
+		case 0x0C: { // changeScene
+			std::string scene = formatValue();
 			std::string mode = formatValue();
 			std::string speed = formatValue();
-			printf("CHANGE_SCENE scene=%s mode=%s speed=%s\n", scene.c_str(), mode.c_str(), speed.c_str());
+			printf("changeScene scene=%s mode=%s speed=%s\n", scene.c_str(), mode.c_str(), speed.c_str());
 			break;
 		}
-		case 0x0D: {
-			std::string objId = formatObjectId();
+		case 0x0D: { // showDialogue
+			std::string obj = formatValue();
 			std::string x = formatValue();
 			std::string y = formatValue();
 			std::string side = formatValue();
 			uint16_t strOffset = readWord();
 			uint16_t numLines = readWord();
-			printf("DIALOGUE speaker=%s pos=(%s, %s) side=%s strOffset=%u numLines=%u\n",
-				   objId.c_str(), x.c_str(), y.c_str(), side.c_str(), strOffset, numLines);
+			printf("showDialogue obj=%s pos=(%s, %s) side=%s strOffset=%u numLines=%u\n",
+				   obj.c_str(), x.c_str(), y.c_str(), side.c_str(), strOffset, numLines);
 			break;
 		}
-		case 0x0E: {
-			std::string id = formatValue32();
-			std::string frame = formatValue();
-			printf("CHANGE_ANIM id=%s frame=%s\n", id.c_str(), frame.c_str());
+		case 0x0E: { // changeAnim
+			printf("changeAnim\n");
 			break;
 		}
-		case 0x0F: {
-			std::string duration = formatValue();
-			printf("WAIT_FRAMES %s\n", duration.c_str());
+		case 0x0F: { // frameWait
+			std::string val = formatValue();
+			printf("frameWait %s\n", val.c_str());
 			break;
 		}
-		case 0x10: {
-			std::string objId = formatObjectId();
+		case 0x10: { // walkTo
+			std::string obj = formatValue();
 			std::string x = formatValue();
 			std::string y = formatValue();
-			printf("WALK_TO obj=%s pos=(%s, %s)\n", objId.c_str(), x.c_str(), y.c_str());
+			printf("walkTo obj=%s pos=(%s, %s)\n", obj.c_str(), x.c_str(), y.c_str());
 			break;
 		}
-		case 0x11: {
-			std::string objId = formatObjectId();
-			printf("WAIT_WALK obj=%s\n", objId.c_str());
+		case 0x11: { // waitForWalk
+			std::string obj = formatValue();
+			printf("waitForWalk obj=%s\n", obj.c_str());
 			break;
 		}
-		case 0x12: {
+		case 0x12: { // setPathOverride
 			std::string area = formatValue();
 			std::string active = formatValue();
-			std::string override_val = formatValue();
-			printf("SET_PATHFINDING area=%s active=%s override=%s\n", area.c_str(), active.c_str(), override_val.c_str());
+			std::string val = formatValue();
+			printf("setPathOverride area=%s active=%s val=%s\n", area.c_str(), active.c_str(), val.c_str());
 			break;
 		}
-		case 0x13: {
-			uint16_t tag = readWord();
-			printf("GOTO_TAG 0x%04X\n", tag);
+		case 0x13: { // loadAnim
+			printf("loadAnim\n");
 			break;
 		}
-		case 0x14: {
-			uint16_t tag = readWord();
-			printf("TAG 0x%04X\n", tag);
+		case 0x14: { // skipWord
+			uint16_t w = readWord();
+			printf("skipWord 0x%04x\n", w);
 			break;
 		}
-		case 0x15: {
-			printf("DIALOGUE_CHOICES_BEGIN\n");
+		case 0x15: { // clearDialogueChoices
+			printf("clearDialogueChoices\n");
 			break;
 		}
-		case 0x16: {
+		case 0x16: { // addDialogueChoice
 			std::string idx = formatValue();
 			uint16_t strOffset = readWord();
 			uint16_t numLines = readWord();
-			printf("DIALOGUE_CHOICE index=%s strOffset=%u numLines=%u\n", idx.c_str(), strOffset, numLines);
+			printf("addDialogueChoice idx=%s strOffset=%u numLines=%u\n", idx.c_str(), strOffset, numLines);
 			break;
 		}
-		case 0x17: {
-			std::string x = formatValue32();
-			std::string y = formatValue32();
+		case 0x17: { // showDialogueChoice
+			std::string obj = formatValue();
+			std::string x = formatValue();
+			std::string y = formatValue();
 			std::string side = formatValue();
-			printf("DIALOGUE_CHOICES_SHOW pos=(%s, %s) side=%s\n", x.c_str(), y.c_str(), side.c_str());
+			printf("showDialogueChoice obj=%s pos=(%s, %s) side=%s\n", obj.c_str(), x.c_str(), y.c_str(), side.c_str());
 			break;
 		}
-		case 0x18: {
-			printf("END_SCRIPT\n");
+		case 0x18: { // dismissPanel
+			printf("dismissPanel\n");
 			break;
 		}
-		case 0x19: {
-			std::string actor = formatObjectId();
-			std::string target = formatObjectId();
-			printf("PICKUP actor=%s target=%s\n", actor.c_str(), target.c_str());
+		case 0x19: { // walkToAndPickup
+			std::string actor = formatValue();
+			std::string obj = formatValue();
+			printf("walkToAndPickup actor=%s obj=%s\n", actor.c_str(), obj.c_str());
 			break;
 		}
-		case 0x1A: {
-			std::string objId = formatObjectId();
-			std::string val217 = formatValue();
-			std::string val219 = formatValue();
-			printf("SET_OBJECT_RUNTIME obj=%s val217=%s val219=%s\n", objId.c_str(), val217.c_str(), val219.c_str());
+		case 0x1A: { // setPickupFrames
+			std::string obj = formatValue();
+			std::string start = formatValue();
+			std::string end = formatValue();
+			printf("setPickupFrames obj=%s start=%s end=%s\n", obj.c_str(), start.c_str(), end.c_str());
 			break;
 		}
-		case 0x1B: {
-			std::string objId = formatObjectId();
+		case 0x1B: { // setAnimSpeed
+			std::string obj = formatValue();
 			std::string slot = formatValue();
-			std::string val = formatValue();
-			printf("SET_OBJECT_SLOT obj=%s slot=%s value=%s\n", objId.c_str(), slot.c_str(), val.c_str());
+			std::string speed = formatValue();
+			printf("setAnimSpeed obj=%s slot=%s speed=%s\n", obj.c_str(), slot.c_str(), speed.c_str());
 			break;
 		}
-		case 0x1C: {
-			printf("SKIPPABLE_BEGIN\n");
+		case 0x1C: { // setSkippable
+			printf("setSkippable\n");
 			break;
 		}
-		case 0x1D: {
-			printf("SKIPPABLE_END\n");
+		case 0x1D: { // clearSkippable
+			printf("clearSkippable\n");
 			break;
 		}
-		case 0x1E: {
-			std::string objId = formatObjectId();
+		case 0x1E: { // loadAnimBlob
+			std::string obj = formatValue();
 			std::string slot = formatValue();
 			std::string frame = formatValue();
-			printf("PLAY_ANIM obj=%s slot=%s frame=%s\n", objId.c_str(), slot.c_str(), frame.c_str());
+			printf("loadAnimBlob obj=%s slot=%s frame=%s\n", obj.c_str(), slot.c_str(), frame.c_str());
 			break;
 		}
-		case 0x1F: {
-			std::string objId = formatObjectId();
-			std::string x = formatValue32();
-			std::string y = formatValue32();
-			printf("TEST_PATH_WALKABLE obj=%s to=(%s, %s)\n", objId.c_str(), x.c_str(), y.c_str());
+		case 0x1F: { // setPosition
+			std::string obj = formatValue();
+			std::string x = formatValue();
+			std::string y = formatValue();
+			printf("setPosition obj=%s pos=(%s, %s)\n", obj.c_str(), x.c_str(), y.c_str());
 			break;
 		}
-		case 0x20: {
-			std::string objId = formatObjectId();
+		case 0x20: { // setVerticalOffset
+			std::string obj = formatValue();
 			std::string offset = formatValue();
-			printf("SET_Y_OFFSET obj=%s offset=%s\n", objId.c_str(), offset.c_str());
+			printf("setVerticalOffset obj=%s offset=%s\n", obj.c_str(), offset.c_str());
 			break;
 		}
-		case 0x21: {
-			std::string objId = formatObjectId();
+		case 0x21: { // setMotion
+			std::string obj = formatValue();
 			std::string target = formatValue();
 			std::string delta = formatValue();
 			std::string dist = formatValue();
-			printf("SET_MOTION obj=%s targetOffset=%s delta=%s distance=%s\n", objId.c_str(), target.c_str(), delta.c_str(), dist.c_str());
+			printf("setMotion obj=%s target=%s delta=%s dist=%s\n", obj.c_str(), target.c_str(), delta.c_str(), dist.c_str());
 			break;
 		}
-		case 0x22: {
-			std::string objId = formatObjectId();
-			std::string orient = formatValue();
-			printf("SET_ORIENTATION obj=%s orientation=%s\n", objId.c_str(), orient.c_str());
+		case 0x22: { // setAnimIndex
+			std::string obj = formatValue();
+			std::string anim = formatValue();
+			printf("setAnimIndex obj=%s anim=%s\n", obj.c_str(), anim.c_str());
 			break;
 		}
-		case 0x23: {
-			std::string objId = formatObjectId();
-			std::string x = formatValue32();
-			std::string y = formatValue32();
-			std::string targetOffset = formatValue();
-			printf("MOVE_TO_POSITION obj=%s pos=(%s, %s) targetOffset=%s\n", objId.c_str(), x.c_str(), y.c_str(), targetOffset.c_str());
-			break;
-		}
-		case 0x24: {
-			std::string a = formatValue32();
-			std::string b = formatValue32();
-			// The save target is embedded in the first value's position
-			// We can't perfectly reconstruct it without re-reading, so show the operands
-			printf("ADD %s + %s -> (save to first operand var)\n", a.c_str(), b.c_str());
-			break;
-		}
-		case 0x25: {
-			std::string a = formatValue32();
-			std::string b = formatValue32();
-			printf("SUB %s - %s -> (save to first operand var)\n", a.c_str(), b.c_str());
-			break;
-		}
-		case 0x26: {
-			std::string objId = formatObjectId();
-			std::string val = formatValue();
-			uint8_t animId = readByte();
-			printf("LOAD_SPECIAL_ANIM obj=%s val=%s animId=%u\n", objId.c_str(), val.c_str(), animId);
-			break;
-		}
-		case 0x27: {
-			std::string charId = formatValue();
-			std::string val = formatValue();
-			printf("SET_DIRECTION charId=%s value=%s\n", charId.c_str(), val.c_str());
-			break;
-		}
-		case 0x28: {
-			std::string objId = formatObjectId();
-			printf("STOP_ANIM obj=%s\n", objId.c_str());
-			break;
-		}
-		case 0x29: {
-			std::string objId = formatObjectId();
-			printf("OPEN_INVENTORY source=%s\n", objId.c_str());
-			break;
-		}
-		case 0x2A: {
-			std::string objId = formatObjectId();
-			std::string slot = formatValue();
-			std::string decode = formatValue();
-			uint8_t arrayIdx = readByte();
-			printf("LOAD_ANIM obj=%s slot=%s decode=%s arrayIdx=%u\n", objId.c_str(), slot.c_str(), decode.c_str(), arrayIdx);
-			break;
-		}
-		case 0x2B: {
-			std::string objId = formatValue();
-			printf("REFRESH_OBJECT obj=%s\n", objId.c_str());
-			break;
-		}
-		case 0x2C: {
-			std::string objId = formatValue();
-			std::string parentId = formatValue();
-			printf("CHECK_INVENTORY obj=%s parent=%s\n", objId.c_str(), parentId.c_str());
-			break;
-		}
-		case 0x2D: {
-			std::string objId = formatValue();
-			std::string enabled = formatValue();
-			printf("SET_RUNTIME_FLAG obj=%s enabled=%s\n", objId.c_str(), enabled.c_str());
-			break;
-		}
-		case 0x2E: {
-			std::string animIdx = formatValue32();
-			std::string minFrame = formatValue32();
-			std::string maxFrame = formatValue32();
-			printf("TEST_SCENE_ANIM_FRAME animIdx=%s min=%s max=%s\n", animIdx.c_str(), minFrame.c_str(), maxFrame.c_str());
-			break;
-		}
-		case 0x2F: {
-			std::string objId = formatObjectId();
-			std::string slot = formatValue();
-			std::string minFrame = formatValue();
-			std::string maxFrame = formatValue();
-			printf("TEST_OBJECT_ANIM_FRAME obj=%s slot=%s min=%s max=%s\n", objId.c_str(), slot.c_str(), minFrame.c_str(), maxFrame.c_str());
-			break;
-		}
-		case 0x30: {
+		case 0x23: { // moveToPosition
+			std::string obj = formatValue();
 			std::string x = formatValue();
 			std::string y = formatValue();
-			uint16_t strOffset = readWord();
-			uint16_t numLines = readWord();
-			printf("PRINT_STRING_RIGHT pos=(%s, %s) strOffset=%u numLines=%u\n", x.c_str(), y.c_str(), strOffset, numLines);
+			std::string voff = formatValue();
+			printf("moveToPosition obj=%s pos=(%s, %s) voff=%s\n", obj.c_str(), x.c_str(), y.c_str(), voff.c_str());
 			break;
 		}
-		case 0x31: {
+		case 0x24: { // add
+			std::string a = formatValue();
+			std::string b = formatValue();
+			printf("add %s, %s\n", a.c_str(), b.c_str());
+			break;
+		}
+		case 0x25: { // subtract
+			std::string a = formatValue();
+			std::string b = formatValue();
+			printf("subtract %s, %s\n", a.c_str(), b.c_str());
+			break;
+		}
+		case 0x26: { // setAnimSlot
+			std::string obj = formatValue();
+			formatValue(); // unused
+			uint8_t animIdx = readByte();
+			printf("setAnimSlot obj=%s anim=%u\n", obj.c_str(), animIdx);
+			break;
+		}
+		case 0x27: { // setMaxAnimFrame
+			std::string obj = formatValue();
+			std::string maxFrame = formatValue();
+			printf("setMaxAnimFrame obj=%s maxFrame=%s\n", obj.c_str(), maxFrame.c_str());
+			break;
+		}
+		case 0x28: { // nop28
+			printf("nop28\n");
+			break;
+		}
+		case 0x29: { // loadSong
+			std::string obj = formatValue();
+			printf("loadSong obj=%s\n", obj.c_str());
+			break;
+		}
+		case 0x2A: { // loadAnimFromScene
+			std::string obj = formatValue();
+			std::string slot = formatValue();
+			std::string decode = formatValue();
+			uint8_t idx = readByte();
+			printf("loadAnimFromScene obj=%s slot=%s decode=%s idx=%u\n", obj.c_str(), slot.c_str(), decode.c_str(), idx);
+			break;
+		}
+		case 0x2B: { // setShading
+			std::string obj = formatValue();
+			printf("setShading obj=%s\n", obj.c_str());
+			break;
+		}
+		case 0x2C: { // setParent
+			std::string obj = formatValue();
+			std::string val = formatValue();
+			printf("setParent obj=%s val=%s\n", obj.c_str(), val.c_str());
+			break;
+		}
+		case 0x2D: { // setScaling
+			std::string obj = formatValue();
+			std::string val = formatValue();
+			printf("setScaling obj=%s val=%s\n", obj.c_str(), val.c_str());
+			break;
+		}
+		case 0x2E: { // checkAnimRange
+			std::string anim = formatValue();
+			std::string lo = formatValue();
+			std::string hi = formatValue();
+			printf("checkAnimRange anim=%s range=[%s, %s]\n", anim.c_str(), lo.c_str(), hi.c_str());
+			break;
+		}
+		case 0x2F: { // checkBlobRange
+			std::string obj = formatValue();
+			std::string slot = formatValue();
+			std::string lo = formatValue();
+			std::string hi = formatValue();
+			printf("checkBlobRange obj=%s slot=%s range=[%s, %s]\n", obj.c_str(), slot.c_str(), lo.c_str(), hi.c_str());
+			break;
+		}
+		case 0x30: { // nop30
+			printf("nop30\n");
+			break;
+		}
+		case 0x31: { // setMusicVolume
 			std::string vol = formatValue();
-			printf("SET_VOLUME %s\n", vol.c_str());
+			printf("setMusicVolume %s\n", vol.c_str());
 			break;
 		}
-		case 0x32: {
-			std::string objId = formatValue();
-			std::string clickable = formatValue();
-			printf("SET_CLICKABLE obj=%s clickable=%s\n", objId.c_str(), clickable.c_str());
+		case 0x32: { // setClickable
+			std::string obj = formatValue();
+			std::string val = formatValue();
+			printf("setClickable obj=%s val=%s\n", obj.c_str(), val.c_str());
 			break;
 		}
-		case 0x33: {
-			std::string objId = formatValue();
-			std::string visible = formatValue();
-			printf("SET_VISIBLE obj=%s visible=%s\n", objId.c_str(), visible.c_str());
+		case 0x33: { // setVisible
+			std::string obj = formatValue();
+			std::string val = formatValue();
+			printf("setVisible obj=%s val=%s\n", obj.c_str(), val.c_str());
 			break;
 		}
-		case 0x34: {
-			std::string v1 = formatValue();
-			std::string v2 = formatValue();
-			printf("SET_HOTSPOT_OVERRIDE %s -> %s\n", v1.c_str(), v2.c_str());
+		case 0x34: { // setHotspotRemap
+			std::string a = formatValue();
+			std::string b = formatValue();
+			printf("setHotspotRemap %s -> %s\n", a.c_str(), b.c_str());
 			break;
 		}
-		case 0x35: {
-			std::string objId = formatValue();
-			std::string otherId = formatValue();
-			std::string val1 = formatValue();
-			std::string val2 = formatValue();
-			std::string val3 = formatValue();
-			printf("SET_BOUNDS_ATTACHMENT obj=%s other=%s v1=%s v2=%s v3=%s\n",
-				   objId.c_str(), otherId.c_str(), val1.c_str(), val2.c_str(), val3.c_str());
+		case 0x35: { // setBoundsAttach
+			std::string obj = formatValue();
+			std::string parent = formatValue();
+			std::string a = formatValue();
+			std::string b = formatValue();
+			std::string c = formatValue();
+			printf("setBoundsAttach obj=%s parent=%s (%s, %s, %s)\n",
+				   obj.c_str(), parent.c_str(), a.c_str(), b.c_str(), c.c_str());
 			break;
 		}
-		case 0x36: {
-			printf("DISMISS_PANEL\n");
+		case 0x36: { // dismissAllPanels
+			printf("dismissAllPanels\n");
 			break;
 		}
-		case 0x37: {
-			printf("RESET_TO_SCENE_SCRIPT\n");
+		case 0x37: { // resetScript
+			printf("resetScript\n");
 			break;
 		}
-		case 0x38: {
+		case 0x38: { // loadOverlayFont
 			uint8_t resIdx = readByte();
-			printf("LOAD_OVERLAY_FONT resource=%u\n", resIdx);
+			printf("loadOverlayFont res=%u\n", resIdx);
 			break;
 		}
-		case 0x39: {
-			printf("END_OVERLAY_TEXT\n");
+		case 0x39: { // endOverlayText
+			printf("endOverlayText\n");
 			break;
 		}
-		case 0x3A: {
+		case 0x3A: { // addOverlayEntry
 			std::string x = formatValue();
 			std::string y = formatValue();
 			std::string align = formatValue();
 			uint16_t strOffset = readWord();
 			uint16_t entryType = readWord();
-			printf("OVERLAY_TEXT_ENTRY pos=(%s, %s) align=%s strOffset=%u type=%u\n",
+			printf("addOverlayEntry pos=(%s, %s) align=%s str=%u type=%u\n",
 				   x.c_str(), y.c_str(), align.c_str(), strOffset, entryType);
 			break;
 		}
-		case 0x3B: {
-			printf("CLEAR_OVERLAY_TEXT\n");
+		case 0x3B: { // clearOverlayEntries
+			printf("clearOverlayEntries\n");
 			break;
 		}
-		case 0x3C: {
+		case 0x3C: { // fadeToBlack
 			std::string speed = formatValue();
-			printf("FADE_TO_BLACK speed=%s\n", speed.c_str());
+			printf("fadeToBlack %s\n", speed.c_str());
 			break;
 		}
-		case 0x3D: {
+		case 0x3D: { // fadeFromBlack
 			std::string speed = formatValue();
-			printf("FADE_IN speed=%s\n", speed.c_str());
+			printf("fadeFromBlack %s\n", speed.c_str());
 			break;
 		}
-		case 0x3E: {
+		case 0x3E: { // loadSoundRes
 			uint8_t resIdx = readByte();
-			printf("LOAD_SOUND resource=%u\n", resIdx);
+			printf("loadSoundRes res=%u\n", resIdx);
 			break;
 		}
-		case 0x3F: {
-			printf("STOP_SOUND\n");
+		case 0x3F: { // clearSound
+			printf("clearSound\n");
 			break;
 		}
-		case 0x40: {
-			printf("PLAY_SOUND\n");
+		case 0x40: { // playSound
+			printf("playSound\n");
 			break;
 		}
-		case 0x41: {
-			printf("WAIT_SOUND\n");
+		case 0x41: { // waitForSound
+			printf("waitForSound\n");
 			break;
 		}
-		case 0x42: {
-			printf("STOP_CURRENT_SOUND\n");
+		case 0x42: { // stopSound
+			printf("stopSound\n");
 			break;
 		}
-		case 0x43: {
+		case 0x43: { // loadMusicSlot
 			std::string slot = formatValue();
 			uint8_t resIdx = readByte();
-			printf("LOAD_MUSIC slot=%s resource=%u\n", slot.c_str(), resIdx);
+			printf("loadMusicSlot slot=%s res=%u\n", slot.c_str(), resIdx);
 			break;
 		}
-		case 0x44: {
+		case 0x44: { // playMusic
 			std::string slot = formatValue();
-			std::string startMuted = formatValue();
-			std::string fadeParam = formatValue();
-			printf("PLAY_MUSIC slot=%s startMuted=%s fade=%s\n", slot.c_str(), startMuted.c_str(), fadeParam.c_str());
+			std::string a = formatValue();
+			std::string b = formatValue();
+			printf("playMusic slot=%s %s %s\n", slot.c_str(), a.c_str(), b.c_str());
 			break;
 		}
-		case 0x45: {
+		case 0x45: { // stopMusic
 			std::string slot = formatValue();
-			std::string immediate = formatValue();
-			std::string fadeParam = formatValue();
-			printf("STOP_MUSIC slot=%s immediate=%s fade=%s\n", slot.c_str(), immediate.c_str(), fadeParam.c_str());
+			std::string a = formatValue();
+			std::string b = formatValue();
+			printf("stopMusic slot=%s %s %s\n", slot.c_str(), a.c_str(), b.c_str());
 			break;
 		}
-		case 0x46: {
+		case 0x46: { // freeMusic
 			std::string slot = formatValue();
-			printf("FREE_MUSIC slot=%s\n", slot.c_str());
+			printf("freeMusic slot=%s\n", slot.c_str());
 			break;
 		}
-		case 0x47: {
-			printf("WAIT_MUSIC\n");
+		case 0x47: { // waitForMusic
+			printf("waitForMusic\n");
 			break;
 		}
-		case 0x48: {
-			std::string objId = formatObjectId();
-			std::string target = formatSaveTarget();
-			printf("GET_OBJECT_X obj=%s -> %s\n", objId.c_str(), target.c_str());
+		case 0x48: { // getObjectX
+			std::string obj = formatValue();
+			printf("getObjectX obj=%s\n", obj.c_str());
 			break;
 		}
-		case 0x49: {
-			std::string objId = formatObjectId();
-			std::string target = formatSaveTarget();
-			printf("GET_OBJECT_Y obj=%s -> %s\n", objId.c_str(), target.c_str());
+		case 0x49: { // getObjectY
+			std::string obj = formatValue();
+			printf("getObjectY obj=%s\n", obj.c_str());
 			break;
 		}
-		case 0x4A: {
-			std::string objId = formatObjectId();
-			std::string target = formatSaveTarget();
-			printf("GET_OBJECT_FIELD obj=%s -> %s\n", objId.c_str(), target.c_str());
+		case 0x4A: { // getObjectField
+			std::string obj = formatValue();
+			printf("getObjectField obj=%s\n", obj.c_str());
 			break;
 		}
-		case 0x4B: {
-			std::string objId = formatObjectId();
-			std::string target = formatSaveTarget();
-			printf("GET_OBJECT_ORIENTATION obj=%s -> %s\n", objId.c_str(), target.c_str());
+		case 0x4B: { // getObjectOrient
+			std::string obj = formatValue();
+			printf("getObjectOrient obj=%s\n", obj.c_str());
 			break;
 		}
-		case 0x4C: {
-			printf("CLEAR_INVENTORY\n");
+		case 0x4C: { // clearActorItems
+			printf("clearActorItems\n");
 			break;
 		}
-		case 0x4D: {
-			std::string src = formatValue();
-			std::string dst = formatValue();
-			printf("SET_AREA_REMAP %s -> %s\n", src.c_str(), dst.c_str());
+		case 0x4D: { // setAreaRemap
+			std::string a = formatValue();
+			std::string b = formatValue();
+			printf("setAreaRemap %s -> %s\n", a.c_str(), b.c_str());
 			break;
 		}
-		case 0x4E: {
-			printf("WAIT_ADLIB_READY\n");
+		case 0x4E: { // waitForAdlib
+			printf("waitForAdlib\n");
 			break;
 		}
 		default: {
-			printf("UNKNOWN_OPCODE 0x%02X (len=%u)\n", opcode, length);
+			printf("??? opcode=0x%02x len=%u\n", opcode, length);
 			break;
 		}
 		}
 
-		// Ensure we advance to the correct position regardless of parsing
 		if (pos != endPos) {
 			pos = endPos;
 		}
@@ -632,23 +574,20 @@ static void disassemble() {
 }
 
 static void printHelp(const char *bin) {
-	printf("MACS2 Script Disassembler\n\n");
+	printf("MACS2 Script Decompiler\n\n");
 	printf("Usage: %s <game_data_file> [scene_index]\n\n", bin);
 	printf("  game_data_file  - The main game data file\n");
-	printf("  scene_index     - Scene number to disassemble (1-based)\n");
-	printf("                    If omitted, disassembles all scenes\n\n");
-	printf("The disassembled script will be written to stdout.\n");
+	printf("  scene_index     - Scene number to decompile (1-based)\n");
+	printf("                    If omitted, decompiles all scenes\n\n");
+	printf("The decompiled script will be written to stdout.\n");
 }
 
 static bool loadSceneScript(FILE *f, uint16_t sceneIndex) {
-	// Calculate offset: sceneIndex * 0xC + 0xC + 0x4 - 0x8
 	uint32_t offset = (uint32_t)sceneIndex * 0xC + 0xC + 0x4 - 0x8;
 	fseek(f, offset, SEEK_SET);
 
 	uint32_t sceneDataOffset;
 	if (fread(&sceneDataOffset, 4, 1, f) != 1) return false;
-	// Little-endian conversion (assuming host is LE for simplicity)
-	// For portability we should do proper byte swapping but this matches the game's target
 
 	fseek(f, sceneDataOffset + 0x80, SEEK_SET);
 
@@ -690,36 +629,30 @@ int main(int argc, char **argv) {
 		startScene = atoi(argv[2]);
 		endScene = startScene;
 	} else {
-		// Try all scenes from 1 to 512
 		startScene = 1;
 		endScene = 512;
 	}
 
 	printf("; MACS2 Script Runtime Variables (type 0xFF, read-only)\n");
 	printf("; These are computed by the engine at read-time, not stored in script data.\n");
-	printf("; $interacted_use         (FF:01) Object ID interacted with via Use/UseInventory cursor\n");
-	printf("; $interacted_look        (FF:02) Object ID interacted with via Look cursor\n");
-	printf("; $interacted_talk        (FF:03) Object ID interacted with via Talk cursor\n");
-	printf("; $char_area              (FF:04) Area ID at protagonist's current position\n");
-	printf("; $repeat_run_flag        (FF:0B) 1 during repeat/object script pass, 0 otherwise\n");
-	printf("; $chosen_dialogue_option (FF:0D) Index of last chosen dialogue option\n");
-	printf("; $path_walkable_result   (FF:23) 1 if last TEST_PATH_WALKABLE succeeded\n");
-	printf("; $actor_x                (FF:24) Protagonist X position\n");
-	printf("; $actor_y                (FF:25) Protagonist Y position\n");
-	printf("; $is_scene_init          (FF:26) 1 during scene initialization pass\n");
-	printf("; $repeat_char_area       (FF:27) Area at char position (only during repeat run)\n");
-	printf("; $inventory_check_result (FF:28) 1 if last CHECK_INVENTORY matched\n");
-	printf("; $anim_range_test_result (FF:29) 1 if last TEST_*_ANIM_FRAME matched\n");
-	printf("; $inventory_combine_flag (FF:2A) 1 if inventory combine pending (no UI open)\n");
-	printf("; $inventory_action_flag  (FF:2B) 1 if inventory action pending (no UI open)\n");
-	printf("; $interacted_panel_use   (FF:2C) Object ID interacted with via PanelUse cursor\n");
-	printf("; $current_scene          (FF:2D) Current scene index\n");
-	printf("; $last_scene             (FF:2F) Previous scene index\n");
-	printf("; $music_enabled          (FF:30) 1 if music enabled and sound system active\n");
-	printf("; $sound_enabled          (FF:31) 1 if sound enabled and sound system active\n");
+	printf("; interactedUse    (FF:01) Object ID interacted with via Use/UseInventory cursor\n");
+	printf("; interactedLook   (FF:02) Object ID interacted with via Look cursor\n");
+	printf("; interactedTalk   (FF:03) Object ID interacted with via Talk cursor\n");
+	printf("; areaAtActor      (FF:04) Area ID at protagonist's current position\n");
+	printf("; isRepeatRun      (FF:0B) 1 during repeat/object script pass, 0 otherwise\n");
+	printf("; dialogueResult   (FF:0D) Index of last chosen dialogue option\n");
+	printf("; pathWalkable     (FF:23) 1 if last setPosition path test succeeded\n");
+	printf("; actorX           (FF:24) Protagonist X position\n");
+	printf("; actorY           (FF:25) Protagonist Y position\n");
+	printf("; isSceneInit      (FF:26) 1 during scene initialization pass\n");
+	printf("; invCheck         (FF:28) 1 if last setParent inventory check matched\n");
+	printf("; invCombine       (FF:2A) 1 if inventory combine pending (no UI open)\n");
+	printf("; invAction        (FF:2B) 1 if inventory action pending (no UI open)\n");
+	printf("; curScene         (FF:2D) Current scene index\n");
+	printf("; prevScene        (FF:2F) Previous scene index\n");
 	printf(";\n");
-	printf("; Script variables: var[1]..var[2048] (read/write, all zeroed on scene load)\n");
-	printf("; Object IDs: raw value - 0x400 = object index (1..512)\n");
+	printf("; Script variables: var[N] (read/write, all zeroed on scene load)\n");
+	printf("; Object IDs in moveObject/etc.: raw value - 0x400 = object index\n");
 	printf(";\n\n");
 
 	for (int scene = startScene; scene <= endScene; scene++) {
