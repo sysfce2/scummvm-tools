@@ -27,7 +27,11 @@
 #include <string.h>
 #include <string>
 #include <vector>
+#ifdef WIN32
+#include <direct.h>
+#else
 #include <sys/stat.h>
+#endif
 
 static FILE *resFile = nullptr;
 
