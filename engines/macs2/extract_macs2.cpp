@@ -21,10 +21,10 @@
 
 /* MACS2 Resource Extractor - extracts images, sounds, music, and strings */
 
-#include <cstdio>
-#include <cstdint>
-#include <cstdlib>
-#include <cstring>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <string>
 #include <vector>
 #include <sys/stat.h>

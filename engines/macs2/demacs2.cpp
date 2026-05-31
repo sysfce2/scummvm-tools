@@ -21,10 +21,10 @@
 
 /* MACS2 Script disassembler */
 
-#include <cstdio>
-#include <cstdint>
-#include <cstdlib>
-#include <cstring>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <vector>
 #include <string>
 
