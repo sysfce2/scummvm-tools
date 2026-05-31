@@ -21,8 +21,8 @@
 
 /* MACS2 Resource Extractor - extracts images, sounds, music, and strings */
 
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <string>
@@ -68,7 +68,8 @@ static bool decodeRLEImage(uint32_t offset, uint8_t *pixels) {
 	fseek(resFile, offset, SEEK_SET);
 	for (int y = 0; y < 200; y++) {
 		uint16_t length = readU16(resFile);
-		if (length == 0 || length > 960) return false;
+		if (length == 0 || length > 960)
+			return false;
 		std::vector<uint8_t> rowData(length);
 		fread(rowData.data(), 1, length, resFile);
 		int remaining = 320;
@@ -81,7 +82,8 @@ static bool decodeRLEImage(uint32_t offset, uint8_t *pixels) {
 				pixels[y * 320 + x++] = val;
 				remaining--;
 			} else {
-				if (ptr + 2 > end) break;
+				if (ptr + 2 > end)
+					break;
 				uint8_t runLen = *ptr++;
 				uint8_t runVal = *ptr++;
 				for (int i = 0; i < runLen && remaining > 0; i++) {
@@ -97,7 +99,10 @@ static bool decodeRLEImage(uint32_t offset, uint8_t *pixels) {
 // Write a BMP file (8-bit indexed)
 static void writeBMP(const char *path, const uint8_t *pixels, const uint8_t *palette) {
 	FILE *f = fopen(path, "wb");
-	if (!f) { fprintf(stderr, "Cannot write %s\n", path); return; }
+	if (!f) {
+		fprintf(stderr, "Cannot write %s\n", path);
+		return;
+	}
 
 	// BMP header
 	uint32_t imageSize = 320 * 200;
@@ -106,21 +111,27 @@ static void writeBMP(const char *path, const uint8_t *pixels, const uint8_t *pal
 	uint32_t fileSize = dataOffset + imageSize;
 
 	// File header
-	fputc('B', f); fputc('M', f);
+	fputc('B', f);
+	fputc('M', f);
 	uint8_t hdr[12] = {};
-	hdr[0] = fileSize & 0xFF; hdr[1] = (fileSize >> 8) & 0xFF;
-	hdr[2] = (fileSize >> 16) & 0xFF; hdr[3] = (fileSize >> 24) & 0xFF;
-	hdr[8] = dataOffset & 0xFF; hdr[9] = (dataOffset >> 8) & 0xFF;
-	hdr[10] = (dataOffset >> 16) & 0xFF; hdr[11] = (dataOffset >> 24) & 0xFF;
+	hdr[0] = fileSize & 0xFF;
+	hdr[1] = (fileSize >> 8) & 0xFF;
+	hdr[2] = (fileSize >> 16) & 0xFF;
+	hdr[3] = (fileSize >> 24) & 0xFF;
+	hdr[8] = dataOffset & 0xFF;
+	hdr[9] = (dataOffset >> 8) & 0xFF;
+	hdr[10] = (dataOffset >> 16) & 0xFF;
+	hdr[11] = (dataOffset >> 24) & 0xFF;
 	fwrite(hdr, 1, 12, f);
 
 	// DIB header (BITMAPINFOHEADER)
 	uint8_t dib[40] = {};
 	dib[0] = 40; // header size
-	dib[4] = 0x40; dib[5] = 0x01; // width = 320
+	dib[4] = 0x40;
+	dib[5] = 0x01; // width = 320
 	dib[8] = 0xC8; // height = 200 (positive = bottom-up)
-	dib[12] = 1; // planes
-	dib[14] = 8; // bpp
+	dib[12] = 1;   // planes
+	dib[14] = 8;   // bpp
 	fwrite(dib, 1, 40, f);
 
 	// Palette (BGRA)
@@ -141,13 +152,18 @@ static void writeBMP(const char *path, const uint8_t *pixels, const uint8_t *pal
 	printf("  Wrote %s\n", path);
 }
 
+// Forward declaration
+static bool decodeRLEMap(FILE *f, uint8_t *pixels);
+
 // Extract background image for a scene
 static void extractImage(uint16_t sceneIndex, const char *outDir) {
 	uint32_t bgOffset = getSceneBgOffset(sceneIndex);
-	if (bgOffset == 0) return;
+	if (bgOffset == 0)
+		return;
 
 	uint8_t pixels[320 * 200];
-	if (!decodeRLEImage(bgOffset, pixels)) return;
+	if (!decodeRLEImage(bgOffset, pixels))
+		return;
 
 	// Palette follows immediately after the image
 	uint8_t palette[768];
@@ -156,12 +172,26 @@ static void extractImage(uint16_t sceneIndex, const char *outDir) {
 	char path[512];
 	snprintf(path, sizeof(path), "%s/scene_%03d.bmp", outDir, sceneIndex);
 	writeBMP(path, pixels, palette);
+
+	// Export the 4 maps as BMP using the scene's own palette (same as imgui debugger)
+	fseek(resFile, 256, SEEK_CUR); // shading table
+	fseek(resFile, 3, SEEK_CUR);   // 3 unknown bytes
+
+	const char *mapNames[] = {"depth", "pathfinding", "unknown", "hotspot"};
+	for (int m = 0; m < 4; m++) {
+		uint8_t mapPixels[320 * 200];
+		if (!decodeRLEMap(resFile, mapPixels))
+			break;
+		snprintf(path, sizeof(path), "%s/scene_%03d_%s.bmp", outDir, sceneIndex, mapNames[m]);
+		writeBMP(path, mapPixels, palette);
+	}
 }
 
 // Extract indexed resources (sounds/music) for a scene
 static void extractResources(uint16_t sceneIndex, const char *outDir, const char *prefix) {
 	uint32_t dataOffset = getSceneDataOffset(sceneIndex);
-	if (dataOffset == 0) return;
+	if (dataOffset == 0)
+		return;
 
 	fseek(resFile, dataOffset, SEEK_SET);
 	uint32_t resourceTable[32]; // 0x80 / 4 = 32 entries
@@ -170,10 +200,12 @@ static void extractResources(uint16_t sceneIndex, const char *outDir, const char
 	}
 
 	for (int i = 0; i < 32; i++) {
-		if (resourceTable[i] == 0) continue;
+		if (resourceTable[i] == 0)
+			continue;
 		fseek(resFile, resourceTable[i], SEEK_SET);
 		uint32_t size = readU32(resFile);
-		if (size == 0 || size > 0x100000) continue;
+		if (size == 0 || size > 0x100000)
+			continue;
 
 		std::vector<uint8_t> data(size);
 		fread(data.data(), 1, size, resFile);
@@ -204,11 +236,13 @@ static std::string decryptString(const uint8_t *data, uint16_t length) {
 // Extract strings for a scene
 static void extractStrings(uint16_t sceneIndex, const char *outDir) {
 	uint32_t strOffset = getSceneStringsOffset(sceneIndex);
-	if (strOffset == 0) return;
+	if (strOffset == 0)
+		return;
 
 	fseek(resFile, strOffset, SEEK_SET);
 	uint16_t totalSize = readU16(resFile);
-	if (totalSize == 0) return;
+	if (totalSize == 0)
+		return;
 
 	std::vector<uint8_t> strData(totalSize);
 	fread(strData.data(), 1, totalSize, resFile);
@@ -216,7 +250,8 @@ static void extractStrings(uint16_t sceneIndex, const char *outDir) {
 	char path[512];
 	snprintf(path, sizeof(path), "%s/strings_scene%03d.txt", outDir, sceneIndex);
 	FILE *out = fopen(path, "w");
-	if (!out) return;
+	if (!out)
+		return;
 
 	fprintf(out, "; Scene %d strings\n", sceneIndex);
 	fprintf(out, "; Total data size: %u bytes\n\n", totalSize);
@@ -227,7 +262,8 @@ static void extractStrings(uint16_t sceneIndex, const char *outDir) {
 	while (pos + 2 <= totalSize) {
 		uint16_t len = strData[pos] | (strData[pos + 1] << 8);
 		pos += 2;
-		if (len == 0 || pos + len > totalSize) break;
+		if (len == 0 || pos + len > totalSize)
+			break;
 		std::string decoded = decryptString(strData.data() + pos, len);
 		fprintf(out, "[%d] (offset=%u) %s\n", stringIndex, (unsigned)(pos - 2), decoded.c_str());
 		pos += len;
@@ -246,14 +282,238 @@ static void mkdirp(const char *path) {
 #endif
 }
 
+// Skip an RLE-compressed 320x200 image in the file (advance past it without decoding)
+static void skipRLEImage(FILE *f) {
+	for (int y = 0; y < 200; y++) {
+		uint16_t length = readU16(f);
+		fseek(f, length, SEEK_CUR);
+	}
+}
+
+// Decode an RLE 320x200 image into a buffer
+static bool decodeRLEMap(FILE *f, uint8_t *pixels) {
+	for (int y = 0; y < 200; y++) {
+		uint16_t length = readU16(f);
+		if (length == 0 || length > 960)
+			return false;
+		std::vector<uint8_t> rowData(length);
+		fread(rowData.data(), 1, length, f);
+		int remaining = 320;
+		int x = 0;
+		uint8_t *ptr = rowData.data();
+		uint8_t *end = ptr + length;
+		while (remaining > 0 && ptr < end) {
+			uint8_t val = *ptr++;
+			if (val != 0xF0) {
+				pixels[y * 320 + x++] = val;
+				remaining--;
+			} else {
+				if (ptr + 2 > end)
+					break;
+				uint8_t runLen = *ptr++;
+				uint8_t runVal = *ptr++;
+				for (int i = 0; i < runLen && remaining > 0; i++) {
+					pixels[y * 320 + x++] = runVal;
+					remaining--;
+				}
+			}
+		}
+	}
+	return true;
+}
+
+static void writeRawFile(const char *path, const uint8_t *data, size_t size) {
+	FILE *f = fopen(path, "wb");
+	if (f) {
+		fwrite(data, 1, size, f);
+		fclose(f);
+	}
+}
+
+// Extract comprehensive scene data as JSON + binary map files
+static void extractSceneData(uint16_t sceneIndex, const char *outDir) {
+	uint32_t bgOffset = getSceneBgOffset(sceneIndex);
+	if (bgOffset == 0)
+		return;
+
+	uint32_t dataOffset = getSceneDataOffset(sceneIndex);
+	uint32_t stringsOffset = getSceneStringsOffset(sceneIndex);
+
+	fseek(resFile, bgOffset, SEEK_SET);
+	skipRLEImage(resFile); // background image
+
+	// Palette (768 bytes, 6-bit VGA)
+	uint8_t palette[768];
+	fread(palette, 1, 768, resFile);
+
+	// Shading table (256 bytes)
+	uint8_t shadingTable[256];
+	fread(shadingTable, 1, 256, resFile);
+
+	// 3 unknown bytes
+	uint8_t unknownBytes[3];
+	fread(unknownBytes, 1, 3, resFile);
+
+	// 4 RLE maps (each 320x200)
+	uint8_t depthMap[320 * 200];
+	uint8_t pathfindingMap[320 * 200];
+	uint8_t unknownMap[320 * 200];
+	uint8_t hotspotMap[320 * 200];
+	decodeRLEMap(resFile, depthMap);
+	decodeRLEMap(resFile, pathfindingMap);
+	decodeRLEMap(resFile, unknownMap);
+	decodeRLEMap(resFile, hotspotMap);
+
+	// Write map binary files
+	char path[512];
+	snprintf(path, sizeof(path), "%s/scene%03d_depth.bin", outDir, sceneIndex);
+	writeRawFile(path, depthMap, sizeof(depthMap));
+	snprintf(path, sizeof(path), "%s/scene%03d_pathfinding.bin", outDir, sceneIndex);
+	writeRawFile(path, pathfindingMap, sizeof(pathfindingMap));
+	snprintf(path, sizeof(path), "%s/scene%03d_unknown.bin", outDir, sceneIndex);
+	writeRawFile(path, unknownMap, sizeof(unknownMap));
+	snprintf(path, sizeof(path), "%s/scene%03d_hotspot.bin", outDir, sceneIndex);
+	writeRawFile(path, hotspotMap, sizeof(hotspotMap));
+
+	// Pathfinding nodes: 16 entries × 10 bytes
+	struct PathNode {
+		uint16_t x, y;
+		uint8_t adj[4];
+		uint16_t numConnections;
+	} nodes[16];
+	for (int i = 0; i < 16; i++) {
+		nodes[i].x = readU16(resFile);
+		nodes[i].y = readU16(resFile);
+		fread(nodes[i].adj, 1, 4, resFile);
+		nodes[i].numConnections = readU16(resFile);
+	}
+
+	uint16_t numHotspots = readU16(resFile);
+
+	// Hotspot color table: 16 uint16 entries (maps pixel value to object ID)
+	uint16_t hotspotColors[16];
+	for (int i = 0; i < 16; i++)
+		hotspotColors[i] = readU16(resFile);
+
+	// Resource offsets from data block (32 dwords = special anim file offsets)
+	uint32_t resourceOffsets[32] = {};
+	uint32_t mapImageOffset = 0;
+	if (dataOffset != 0) {
+		fseek(resFile, dataOffset, SEEK_SET);
+		for (int i = 0; i < 32; i++)
+			resourceOffsets[i] = readU32(resFile);
+		// Map image offset at data block +0x3C0
+		fseek(resFile, dataOffset + 0x3C0, SEEK_SET);
+		mapImageOffset = readU32(resFile);
+	}
+
+	// Script size
+	uint16_t scriptSize = 0;
+	if (dataOffset != 0) {
+		fseek(resFile, dataOffset + 0x80, SEEK_SET);
+		scriptSize = readU16(resFile);
+	}
+
+	// Strings size
+	uint16_t stringsSize = 0;
+	if (stringsOffset != 0) {
+		fseek(resFile, stringsOffset, SEEK_SET);
+		stringsSize = readU16(resFile);
+	}
+
+	// Write JSON
+	snprintf(path, sizeof(path), "%s/scenedata_%03d.json", outDir, sceneIndex);
+	FILE *out = fopen(path, "w");
+	if (!out)
+		return;
+
+	fprintf(out, "{\n");
+	fprintf(out, "  \"scene\": %d,\n", sceneIndex);
+	fprintf(out, "  \"offsets\": {\n");
+	fprintf(out, "    \"background\": %u,\n", bgOffset);
+	fprintf(out, "    \"data\": %u,\n", dataOffset);
+	fprintf(out, "    \"strings\": %u,\n", stringsOffset);
+	fprintf(out, "    \"mapImage\": %u\n", mapImageOffset);
+	fprintf(out, "  },\n");
+	fprintf(out, "  \"scriptSize\": %u,\n", scriptSize);
+	fprintf(out, "  \"stringsSize\": %u,\n", stringsSize);
+
+	// Palette
+	fprintf(out, "  \"palette\": [");
+	for (int i = 0; i < 256; i++) {
+		if (i > 0)
+			fprintf(out, ",");
+		if (i % 8 == 0)
+			fprintf(out, "\n    ");
+		fprintf(out, "[%u,%u,%u]", palette[i * 3], palette[i * 3 + 1], palette[i * 3 + 2]);
+	}
+	fprintf(out, "\n  ],\n");
+
+	// Shading table
+	fprintf(out, "  \"shadingTable\": [");
+	for (int i = 0; i < 256; i++) {
+		if (i > 0)
+			fprintf(out, ",");
+		if (i % 32 == 0)
+			fprintf(out, "\n    ");
+		fprintf(out, "%u", shadingTable[i]);
+	}
+	fprintf(out, "\n  ],\n");
+
+	fprintf(out, "  \"unknownBytes\": [%u, %u, %u],\n", unknownBytes[0], unknownBytes[1], unknownBytes[2]);
+
+	// Pathfinding nodes
+	fprintf(out, "  \"pathfindingNodes\": [\n");
+	for (int i = 0; i < 16; i++) {
+		fprintf(out, "    {\"index\": %d, \"x\": %u, \"y\": %u, \"adjacent\": [", i, nodes[i].x, nodes[i].y);
+		for (uint16_t j = 0; j < nodes[i].numConnections && j < 4; j++) {
+			if (j > 0)
+				fprintf(out, ", ");
+			fprintf(out, "%u", nodes[i].adj[j]);
+		}
+		fprintf(out, "]}%s\n", i < 15 ? "," : "");
+	}
+	fprintf(out, "  ],\n");
+
+	fprintf(out, "  \"numHotspots\": %u,\n", numHotspots);
+	fprintf(out, "  \"hotspotColorTable\": [");
+	for (int i = 0; i < 16; i++) {
+		if (i > 0)
+			fprintf(out, ", ");
+		fprintf(out, "%u", hotspotColors[i]);
+	}
+	fprintf(out, "],\n");
+
+	// Resource offsets (special animation file offsets)
+	fprintf(out, "  \"resourceOffsets\": [");
+	for (int i = 0; i < 32; i++) {
+		if (i > 0)
+			fprintf(out, ", ");
+		fprintf(out, "%u", resourceOffsets[i]);
+	}
+	fprintf(out, "],\n");
+
+	// Map file references
+	fprintf(out, "  \"maps\": {\n");
+	fprintf(out, "    \"depth\": \"scene%03d_depth.bin\",\n", sceneIndex);
+	fprintf(out, "    \"pathfinding\": \"scene%03d_pathfinding.bin\",\n", sceneIndex);
+	fprintf(out, "    \"unknown\": \"scene%03d_unknown.bin\",\n", sceneIndex);
+	fprintf(out, "    \"hotspot\": \"scene%03d_hotspot.bin\"\n", sceneIndex);
+	fprintf(out, "  }\n");
+	fprintf(out, "}\n");
+	fclose(out);
+	printf("  Wrote %s + 4 map files\n", path);
+}
+
 static void printHelp(const char *bin) {
 	printf("MACS2 Resource Extractor\n\n");
 	printf("Usage: %s <mode> <game_data_file> <output_dir> [scene_index]\n\n", bin);
 	printf("Modes:\n");
-	printf("  images   - Extract background images as BMP files\n");
-	printf("  sounds   - Extract sound/music resource blobs\n");
-	printf("  strings  - Extract and decrypt text strings\n");
-	printf("  all      - Extract everything\n");
+	printf("  images    - Extract background images as BMP files\n");
+	printf("  sounds    - Extract sound/music resource blobs\n");
+	printf("  strings   - Extract and decrypt text strings\n");
+	printf("  scenedata - Extract scene metadata as JSON (pathfinding, hotspots, walk params)\n");
+	printf("  all       - Extract everything\n");
 	printf("\n");
 	printf("If scene_index is omitted, extracts from all scenes.\n");
 }
@@ -284,6 +544,7 @@ int main(int argc, char **argv) {
 	bool doImages = !strcmp(mode, "images") || !strcmp(mode, "all");
 	bool doSounds = !strcmp(mode, "sounds") || !strcmp(mode, "all");
 	bool doStrings = !strcmp(mode, "strings") || !strcmp(mode, "all");
+	bool doSceneData = !strcmp(mode, "scenedata") || !strcmp(mode, "all");
 
 	for (int scene = startScene; scene <= endScene; scene++) {
 		bool hasData = false;
@@ -291,7 +552,10 @@ int main(int argc, char **argv) {
 		if (doImages) {
 			uint32_t bgOff = getSceneBgOffset(scene);
 			if (bgOff != 0) {
-				if (!hasData) { printf("Scene %d:\n", scene); hasData = true; }
+				if (!hasData) {
+					printf("Scene %d:\n", scene);
+					hasData = true;
+				}
 				extractImage(scene, outDir);
 			}
 		}
@@ -299,7 +563,10 @@ int main(int argc, char **argv) {
 		if (doSounds) {
 			uint32_t dataOff = getSceneDataOffset(scene);
 			if (dataOff != 0) {
-				if (!hasData) { printf("Scene %d:\n", scene); hasData = true; }
+				if (!hasData) {
+					printf("Scene %d:\n", scene);
+					hasData = true;
+				}
 				extractResources(scene, outDir, "res");
 			}
 		}
@@ -307,8 +574,22 @@ int main(int argc, char **argv) {
 		if (doStrings) {
 			uint32_t strOff = getSceneStringsOffset(scene);
 			if (strOff != 0) {
-				if (!hasData) { printf("Scene %d:\n", scene); hasData = true; }
+				if (!hasData) {
+					printf("Scene %d:\n", scene);
+					hasData = true;
+				}
 				extractStrings(scene, outDir);
+			}
+		}
+
+		if (doSceneData) {
+			uint32_t bgOff = getSceneBgOffset(scene);
+			if (bgOff != 0) {
+				if (!hasData) {
+					printf("Scene %d:\n", scene);
+					hasData = true;
+				}
+				extractSceneData(scene, outDir);
 			}
 		}
 	}
