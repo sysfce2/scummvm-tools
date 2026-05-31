@@ -21,10 +21,10 @@
 
 /* MACS2 Script decompiler */
 
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdio>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <vector>
 #include <string>
 
@@ -337,11 +337,11 @@ static void disassemble() {
 			printf("subtract %s, %s\n", a.c_str(), b.c_str());
 			break;
 		}
-		case 0x26: { // setAnimSlot
+		case 0x26: { // loadSpecialAnim
 			std::string obj = formatValue();
-			formatValue(); // unused
+			std::string decodeFlag = formatValue(); // decode/enable flag (runtime +0x182)
 			uint8_t animIdx = readByte();
-			printf("setAnimSlot obj=%s anim=%u\n", obj.c_str(), animIdx);
+			printf("loadSpecialAnim obj=%s decode=%s anim=%u\n", obj.c_str(), decodeFlag.c_str(), animIdx);
 			break;
 		}
 		case 0x27: { // setMaxAnimFrame
@@ -403,9 +403,9 @@ static void disassemble() {
 			printf("nop30\n");
 			break;
 		}
-		case 0x31: { // setMusicVolume
+		case 0x31: { // setVolume
 			std::string vol = formatValue();
-			printf("setMusicVolume %s\n", vol.c_str());
+			printf("setVolume %s\n", vol.c_str());
 			break;
 		}
 		case 0x32: { // setClickable
