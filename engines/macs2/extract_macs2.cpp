@@ -177,7 +177,7 @@ static void extractImage(uint16_t sceneIndex, const char *outDir) {
 	fseek(resFile, 256, SEEK_CUR); // shading table
 	fseek(resFile, 3, SEEK_CUR);   // 3 unknown bytes
 
-	const char *mapNames[] = {"depth", "pathfinding", "unknown", "hotspot"};
+	const char *mapNames[] = {"depth", "pathfinding", "shadow", "hotspot"};
 	for (int m = 0; m < 4; m++) {
 		uint8_t mapPixels[320 * 200];
 		if (!decodeRLEMap(resFile, mapPixels))
@@ -357,11 +357,11 @@ static void extractSceneData(uint16_t sceneIndex, const char *outDir) {
 	// 4 RLE maps (each 320x200)
 	uint8_t depthMap[320 * 200];
 	uint8_t pathfindingMap[320 * 200];
-	uint8_t unknownMap[320 * 200];
+	uint8_t shadowMap[320 * 200];
 	uint8_t hotspotMap[320 * 200];
 	decodeRLEMap(resFile, depthMap);
 	decodeRLEMap(resFile, pathfindingMap);
-	decodeRLEMap(resFile, unknownMap);
+	decodeRLEMap(resFile, shadowMap);
 	decodeRLEMap(resFile, hotspotMap);
 
 	// Write map binary files
@@ -370,8 +370,8 @@ static void extractSceneData(uint16_t sceneIndex, const char *outDir) {
 	writeRawFile(path, depthMap, sizeof(depthMap));
 	snprintf(path, sizeof(path), "%s/scene%03d_pathfinding.bin", outDir, sceneIndex);
 	writeRawFile(path, pathfindingMap, sizeof(pathfindingMap));
-	snprintf(path, sizeof(path), "%s/scene%03d_unknown.bin", outDir, sceneIndex);
-	writeRawFile(path, unknownMap, sizeof(unknownMap));
+	snprintf(path, sizeof(path), "%s/scene%03d_shadow.bin", outDir, sceneIndex);
+	writeRawFile(path, shadowMap, sizeof(shadowMap));
 	snprintf(path, sizeof(path), "%s/scene%03d_hotspot.bin", outDir, sceneIndex);
 	writeRawFile(path, hotspotMap, sizeof(hotspotMap));
 
@@ -497,7 +497,7 @@ static void extractSceneData(uint16_t sceneIndex, const char *outDir) {
 	fprintf(out, "  \"maps\": {\n");
 	fprintf(out, "    \"depth\": \"scene%03d_depth.bin\",\n", sceneIndex);
 	fprintf(out, "    \"pathfinding\": \"scene%03d_pathfinding.bin\",\n", sceneIndex);
-	fprintf(out, "    \"unknown\": \"scene%03d_unknown.bin\",\n", sceneIndex);
+	fprintf(out, "    \"shadow\": \"scene%03d_shadow.bin\",\n", sceneIndex);
 	fprintf(out, "    \"hotspot\": \"scene%03d_hotspot.bin\"\n", sceneIndex);
 	fprintf(out, "  }\n");
 	fprintf(out, "}\n");
