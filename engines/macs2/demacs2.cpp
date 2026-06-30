@@ -37,6 +37,12 @@ static uint32_t stringDataSize = 0;
 
 static bool amigaMode = false;
 
+static std::string uintToString(uint32_t value) {
+	char buf[16];
+	snprintf(buf, sizeof(buf), "%u", value);
+	return buf;
+}
+
 static void appendUtf8(std::string &out, uint8_t ch) {
 	if (ch < 0x80) {
 		out += (char)ch;
@@ -1794,7 +1800,7 @@ static std::string decodeCLine(uint8_t opcode, uint32_t endPos, int &indent) {
 		uint16_t s = readWord();
 		uint16_t n = readWord();
 		std::string decoded = decodeString(s, n);
-		std::string result2 = std::string(opcode == 0x0A ? "printStringLeft(" : "printStringRight(") + x + ", " + y + ", " + std::to_string(s) + ", " + std::to_string(n) + ");";
+		std::string result2 = std::string(opcode == 0x0A ? "printStringLeft(" : "printStringRight(") + x + ", " + y + ", " + uintToString(s) + ", " + uintToString(n) + ");";
 		if (!decoded.empty())
 			result2 += " // \"" + decoded + "\"";
 		return result2;
@@ -1825,7 +1831,7 @@ static std::string decodeCLine(uint8_t opcode, uint32_t endPos, int &indent) {
 		uint16_t so = readWord();
 		uint16_t n = readWord();
 		std::string decoded = decodeString(so, n);
-		std::string result2 = std::string("showDialogue(") + o + ", " + x + ", " + y + ", " + s + ", " + std::to_string(so) + ", " + std::to_string(n) + ");";
+		std::string result2 = std::string("showDialogue(") + o + ", " + x + ", " + y + ", " + s + ", " + uintToString(so) + ", " + uintToString(n) + ");";
 		if (!decoded.empty())
 			result2 += " // \"" + decoded + "\"";
 		return result2;
@@ -1874,7 +1880,7 @@ static std::string decodeCLine(uint8_t opcode, uint32_t endPos, int &indent) {
 		uint16_t s = readWord();
 		uint16_t n = readWord();
 		std::string decoded = decodeString(s, n);
-		std::string result2 = std::string("addDialogueChoice(") + i + ", " + std::to_string(s) + ", " + std::to_string(n) + ");";
+		std::string result2 = std::string("addDialogueChoice(") + i + ", " + uintToString(s) + ", " + uintToString(n) + ");";
 		if (!decoded.empty())
 			result2 += " // \"" + decoded + "\"";
 		return result2;
@@ -2077,7 +2083,7 @@ static std::string decodeCLine(uint8_t opcode, uint32_t endPos, int &indent) {
 		uint16_t s = readWord();
 		uint16_t t = readWord();
 		std::string decoded = decodeString(s, 1);
-		std::string result2 = std::string("addOverlayTextEntry(") + x + ", " + y + ", " + a + ", " + std::to_string(s) + ", " + std::to_string(t) + ");";
+		std::string result2 = std::string("addOverlayTextEntry(") + x + ", " + y + ", " + a + ", " + uintToString(s) + ", " + uintToString(t) + ");";
 		if (!decoded.empty())
 			result2 += " // \"" + decoded + "\"";
 		return result2;

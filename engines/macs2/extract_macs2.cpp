@@ -28,10 +28,25 @@
 #include <set>
 #include <string>
 #include <vector>
-#ifdef WIN32
-#include <direct.h>
-#else
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+#endif
+
+#ifndef S_ISDIR
+#ifdef S_IFDIR
+#define S_ISDIR(m) (((m) & S_IFDIR) == S_IFDIR)
+#elif defined(_S_IFDIR)
+#define S_ISDIR(m) (((m) & _S_IFDIR) == _S_IFDIR)
+#endif
+#endif
+
+#ifndef S_ISREG
+#ifdef S_IFREG
+#define S_ISREG(m) (((m) & S_IFREG) == S_IFREG)
+#elif defined(_S_IFREG)
+#define S_ISREG(m) (((m) & _S_IFREG) == _S_IFREG)
+#endif
 #endif
 
 static FILE *resFile = nullptr;
